@@ -25,6 +25,8 @@ use App\Http\Controllers\Api\Site\UserOrderController;
 use App\Http\Controllers\Api\Site\UserBannerController;
 use App\Http\Controllers\Api\Site\UserProductImageController;
 use App\Http\Controllers\Api\Site\ProductInventoryController;
+use App\Http\Controllers\Api\Site\UserTopicController;
+use App\Http\Controllers\Api\Site\UserPostController;
 
 // --- 2. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP) ---
 Route::post('/register', [AuthController::class, 'register']);
@@ -35,6 +37,9 @@ Route::get('/products/{id}', [UserProductController::class, 'show']);
 Route::get('/banners/slideshow', [UserBannerController::class, 'getSlideshowBanner']);
 Route::get('/products/{id}/images', [UserProductImageController::class, 'index']);
 Route::get('/products/{id}/inventory', [ProductInventoryController::class, 'show']);
+Route::get('topics', [UserTopicController::class, 'index']);
+Route::get('posts', [UserPostController::class, 'index']);
+Route::get('posts/{slug}', [UserPostController::class, 'show']);
 
 // --- 3. ROUTE USER (CẦN ĐĂNG NHẬP) ---
 Route::middleware('auth:sanctum')->group(function () {
