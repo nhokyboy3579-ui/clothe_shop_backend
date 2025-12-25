@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Admin\ProductImageController;
 use App\Http\Controllers\Api\Admin\ProductAttributeController;
 use App\Http\Controllers\Api\Admin\PostController;
 use App\Http\Controllers\Api\Admin\ProductStoreController;
+use App\Http\Controllers\Api\Admin\TopicController;
 
 // Site Controllers
 use App\Http\Controllers\Api\Site\UserProductController;
@@ -99,12 +100,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/{id}', [BannerController::class, 'update']);
         Route::delete('/{id}', [BannerController::class, 'destroy']);
     });
-    // Quản lý Bài viết (Post)
-    Route::get('/posts', [PostController::class, 'index']);
-    Route::post('/posts', [PostController::class, 'store']);
-    Route::get('/posts/{id}', [PostController::class, 'show']);
-    Route::put('/posts/{id}', [PostController::class, 'update']);
-    Route::delete('/posts/{id}', [PostController::class, 'destroy']);
+
     // Sale & Images & Attributes
     Route::get('/product-sales', [ProductSaleController::class, 'index']);
     Route::post('/product-sales', [ProductSaleController::class, 'store']);
@@ -121,4 +117,11 @@ Route::prefix('admin')->group(function () {
     Route::post('product-attributes', [ProductAttributeController::class, 'store']); // Thêm mới
     Route::delete('product-attributes/{id}', [ProductAttributeController::class, 'destroy']); // Xóa
     Route::get('attributes-list', [ProductAttributeController::class, 'getAttributeTypes']);
+
+    //Post Manager
+    Route::get('posts/topics', [PostController::class, 'getTopics']);
+    Route::apiResource('posts', PostController::class);
+
+    //Topic
+    Route::apiResource('topics', TopicController::class);
 });
