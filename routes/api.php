@@ -16,8 +16,6 @@ use App\Http\Controllers\Api\Admin\ProductSaleController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
 use App\Http\Controllers\Api\Admin\ProductAttributeController;
 use App\Http\Controllers\Api\Admin\PostController;
-
-// Controller MỚI (Lưu ý: Bạn phải chắc chắn file này nằm đúng thư mục Admin)
 use App\Http\Controllers\Api\Admin\ProductStoreController;
 
 // Site Controllers
@@ -25,17 +23,17 @@ use App\Http\Controllers\Api\Site\UserProductController;
 use App\Http\Controllers\Api\Site\UserOrderController;
 use App\Http\Controllers\Api\Site\UserBannerController;
 use App\Http\Controllers\Api\Site\UserProductImageController;
+use App\Http\Controllers\Api\Site\ProductInventoryController;
 
 // --- 2. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP) ---
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-
 Route::get('/products/active', [UserProductController::class, 'indexActiveProducts']);
 Route::get('products/sale', [UserProductController::class, 'getFlashSaleProducts']);
 Route::get('/products/{id}', [UserProductController::class, 'show']);
 Route::get('/banners/slideshow', [UserBannerController::class, 'getSlideshowBanner']);
-
 Route::get('/products/{id}/images', [UserProductImageController::class, 'index']);
+Route::get('/products/{id}/inventory', [ProductInventoryController::class, 'show']);
 
 // --- 3. ROUTE USER (CẦN ĐĂNG NHẬP) ---
 Route::middleware('auth:sanctum')->group(function () {
