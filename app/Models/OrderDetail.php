@@ -9,7 +9,15 @@ class OrderDetail extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['order_id', 'product_id', 'price', 'quantity', 'variant']; // Kiểm tra kỹ tên cột quantity
+    protected $fillable = [
+    'order_id',
+    'product_id',
+    'product_name',
+    'variant',
+    'quantity',
+    'price',
+    'total'
+];
 
     // --- BẮT BUỘC PHẢI CÓ HÀM NÀY ĐỂ DÙNG whereHas('order') ---
     public function order()

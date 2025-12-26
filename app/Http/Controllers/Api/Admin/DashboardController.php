@@ -7,28 +7,66 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // 1. Tổng doanh thu (Tính tổng cột total_amount của các đơn đã hoàn thành - status = 3)
-        $revenue = Order::where('status', 3)->sum('total_amount');
+        // 1. Thống kê tổng quát (Dòng tiền)
+        $moneyReceived = Order::where('status', 4)->sum('total_amount'); // Giả sử 4 là Hoàn thành
+        $moneyPending = Order::whereIn('status', [1, 2, 3])->sum('total_amount'); // Đang xử lý/giao
 
-        // 2. Số đơn hàng mới (status = 1)
-        $newOrders = Order::where('status', 1)->count();
+        // 2. Doanh thu 7 ngày gần nhất (Dùng cho biểu đồ đường)
+        $dailyRevenue = Order::where('status', 4)
+            ->where('created_at', '>=', Carbon::now()->subDays(7))
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('SUM(total_amount) as total')
+            )
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
+            ->get();
 
-        // 3. Tổng số sản phẩm
-        $totalProducts = Product::count();
+        // 3. Doanh thu theo tháng trong năm hiện tại
+        $monthlyRevenue = Order::where('status', 4)
+            ->whereYear('created_at', date('Y'))
+            ->select(
+                DB::raw('MONTH(created_at) as month'),
+                DB::raw('SUM(total_amount) as total')
+            )
+            ->groupBy('month')
+            ->orderBy('month', 'ASC')
+            ->get();
 
-        // 4. Tổng số khách hàng
-        $totalUsers = User::where('role', 'customer')->count();
+        // 4. 5 đơn hàng mới nhất
+        $latestOrders = Order::with('user')
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function($order) {
+                return [
+                    'id' => $order->id,
+                    'customer' => $order->customer_name,
+                    'total' => $order->total_amount,
+                    'status' => $order->status, // Cần khớp với hằng số trạng thái
+                    'created_at' => $order->created_at->diffForHumans()
+                ];
+            });
 
         return response()->json([
-            'revenue' => $revenue,
-            'new_orders' => $newOrders,
-            'total_products' => $totalProducts,
-            'total_users' => $totalUsers
+            'stats' => [
+                'money_received' => $moneyReceived,
+                'money_pending' => $moneyPending,
+                'total_products' => Product::count(),
+                'total_users' => User::where('role', 'customer')->count(),
+            ],
+            'charts' => [
+                'daily' => $dailyRevenue,
+                'monthly' => $monthlyRevenue
+            ],
+            'latest_orders' => $latestOrders
         ]);
     }
 }
