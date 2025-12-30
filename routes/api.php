@@ -3,8 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// --- 1. IMPORT CONTROLLERS ---
+//Authority Bảo Mật
 use App\Http\Controllers\Api\AuthController;
+
+//Admin Controllers
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\CategoryController;
@@ -27,6 +29,7 @@ use App\Http\Controllers\Api\Site\UserProductImageController;
 use App\Http\Controllers\Api\Site\ProductInventoryController;
 use App\Http\Controllers\Api\Site\UserTopicController;
 use App\Http\Controllers\Api\Site\UserPostController;
+use App\Http\Controllers\Api\Site\ForgotPasswordController;
 
 // --- 2. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP) ---
 Route::post('/register', [AuthController::class, 'register']);
@@ -40,6 +43,8 @@ Route::get('/products/{id}/inventory', [ProductInventoryController::class, 'show
 Route::get('topics', [UserTopicController::class, 'index']);
 Route::get('posts', [UserPostController::class, 'index']);
 Route::get('posts/{slug}', [UserPostController::class, 'show']);
+Route::post('/forgot-password/send-otp', [ForgotPasswordController::class, 'sendOtp']);
+Route::post('/forgot-password/verify-reset', [ForgotPasswordController::class, 'verifyAndReset']);
 
 // --- 3. ROUTE USER (CẦN ĐĂNG NHẬP) ---
 Route::middleware('auth:sanctum')->group(function () {
