@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\Site\ProductInventoryController;
 use App\Http\Controllers\Api\Site\UserTopicController;
 use App\Http\Controllers\Api\Site\UserPostController;
 use App\Http\Controllers\Api\Site\ForgotPasswordController;
+use App\Http\Controllers\Api\Payment\MomoController; // <--- THÊM MỚI CONTROLLER MOMO
 
 // --- 2. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP) ---
 Route::post('/register', [AuthController::class, 'register']);
@@ -46,6 +47,10 @@ Route::get('posts/{slug}', [UserPostController::class, 'show']);
 Route::post('/forgot-password/send-otp', [ForgotPasswordController::class, 'sendOtp']);
 Route::post('/forgot-password/verify-reset', [ForgotPasswordController::class, 'verifyAndReset']);
 
+// --- MOMO CALLBACK (IPN) ---
+// Route này PHẢI nằm ngoài Middleware Auth vì MoMo sẽ gọi trực tiếp
+Route::post('/payment/momo/notify', [MomoController::class, 'momoNotify']);
+
 // --- 3. ROUTE USER (CẦN ĐĂNG NHẬP) ---
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
@@ -54,16 +59,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
+
+    // Order & Checkout
     Route::post('/checkout', [UserOrderController::class, 'checkout']);
     Route::get('/my-orders', [UserOrderController::class, 'myOrders']);
+    Route::get('/orders/{id}', [UserOrderController::class, 'show']); // Thêm để frontend polling trạng thái
     Route::post('/orders/{id}/cancel', [UserOrderController::class, 'cancelOrder']);
 });
 
 // --- 4. ROUTE ADMIN (QUẢN TRỊ) ---
-// Nên thêm middleware('auth:sanctum') nếu muốn bảo mật
 Route::prefix('admin')->group(function () {
 
-    // --- A. Quản lý Kho (Product Store) - CODE MỚI CỦA BẠN ---
+    // --- A. Quản lý Kho (Product Store) ---
     Route::get('/product-store', [ProductStoreController::class, 'index']);
     Route::post('/product-store', [ProductStoreController::class, 'store']);
     Route::put('/product-store/{id}', [ProductStoreController::class, 'update']);
@@ -127,9 +134,9 @@ Route::prefix('admin')->group(function () {
         Route::delete('/{id}', [ProductImageController::class, 'destroy']);
     });
 
-    Route::get('product-attributes/{productId}', [ProductAttributeController::class, 'index']); // Lấy list theo SP
-    Route::post('product-attributes', [ProductAttributeController::class, 'store']); // Thêm mới
-    Route::delete('product-attributes/{id}', [ProductAttributeController::class, 'destroy']); // Xóa
+    Route::get('product-attributes/{productId}', [ProductAttributeController::class, 'index']);
+    Route::post('product-attributes', [ProductAttributeController::class, 'store']);
+    Route::delete('product-attributes/{id}', [ProductAttributeController::class, 'destroy']);
     Route::get('attributes-list', [ProductAttributeController::class, 'getAttributeTypes']);
 
     //Post Manager

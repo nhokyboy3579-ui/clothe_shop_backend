@@ -195,4 +195,20 @@ class UserOrderController extends Controller
             ], 500);
         }
     }
+    public function show($id)
+    {
+        // Tìm đơn hàng của người dùng hiện tại
+        $order = Order::where('id', $id)
+            ->where('user_id', auth()->id()) // Đảm bảo bảo mật, chỉ xem đơn của chính mình
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'message' => 'Không tìm thấy đơn hàng'
+            ], 404);
+        }
+
+        // Trả về thông tin đơn hàng (bao gồm status và payment_status)
+        return response()->json($order);
+    }
 }
