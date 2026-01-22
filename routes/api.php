@@ -55,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::post('/checkout', [UserOrderController::class, 'checkout']);
+    Route::get('/my-orders', [UserOrderController::class, 'myOrders']);
+    Route::post('/orders/{id}/cancel', [UserOrderController::class, 'cancelOrder']);
 });
 
 // --- 4. ROUTE ADMIN (QUẢN TRỊ) ---
