@@ -48,10 +48,12 @@ Route::post('/forgot-password/verify-reset', [ForgotPasswordController::class, '
 
 // --- 3. ROUTE USER (CẦN ĐĂNG NHẬP) ---
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user', function (Request $request) { return $request->user(); });
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
-    Route::post('/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::post('/checkout', [UserOrderController::class, 'checkout']);
 });
 

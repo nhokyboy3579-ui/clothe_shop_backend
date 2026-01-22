@@ -15,9 +15,19 @@ class Order extends Model
     protected $table = 'orders';
 
     protected $fillable = [
-        'user_id', 'customer_name', 'customer_email', 'customer_phone',
-        'shipping_address', 'note', 'payment_method', 'payment_status',
-        'subtotal', 'shipping_fee', 'total_amount', 'status'
+        'user_id',
+        'customer_name',
+        'customer_email',
+        'customer_phone',
+        'shipping_address',
+        'note',
+        'payment_method',
+        'payment_status',
+        'subtotal',
+        'shipping_fee',
+        'total_amount',
+        'status',
+        // Đã xóa 'created_by' vì không có trong Schema Migration của bạn
     ];
 
     // Định nghĩa các hằng số trạng thái
@@ -30,11 +40,10 @@ class Order extends Model
     // --- RELATIONSHIPS ---
 
     /**
-     * Lấy người dùng đã đặt hàng (Guest Checkout được phép null)
+     * Người đặt hàng (Sử dụng user_id hiện có trong Schema)
      */
     public function user(): BelongsTo
     {
-        // Thêm withDefault để xử lý Guest Checkout hoặc user bị xóa
         return $this->belongsTo(User::class, 'user_id')->withDefault([
             'name' => 'Khách vãng lai'
         ]);
@@ -51,11 +60,11 @@ class Order extends Model
     // --- ACCESSORS ---
 
     /**
-     * Chuyển đổi mã trạng thái số thành tên chuỗi dễ đọc
+     * Chuyển đổi mã trạng thái sang tên hiển thị (Dùng cho Admin/User UI)
      */
     public function getStatusNameAttribute(): string
     {
-        return match ($this->status) {
+        return match ((int)$this->status) {
             self::STATUS_NEW => 'Mới / Chờ xác nhận',
             self::STATUS_PROCESSING => 'Đang xử lý',
             self::STATUS_SHIPPING => 'Đang giao hàng',

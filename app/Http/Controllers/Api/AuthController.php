@@ -134,12 +134,12 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'phone' => 'nullable|numeric|digits_between:10,11',
+            'phone' => 'nullable|string|max:15', // Đổi sang string để linh hoạt hơn
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'password' => 'nullable|min:6|confirmed'
+            'password' => 'nullable|min:6' // Đã bỏ 'confirmed' để khớp với giao diện 1 ô nhập
         ], [
             'email.unique' => 'Email này đã thuộc về một thành viên khác.',
-            'password.confirmed' => 'Mật khẩu xác nhận không trùng khớp.'
+            'password.min' => 'Mật khẩu phải từ 6 ký tự trở lên.'
         ]);
 
         if ($validator->fails()) {
@@ -164,6 +164,7 @@ class AuthController extends Controller
 
             $user->save();
 
+            // Gắn thêm các trường dữ liệu để Frontend cập nhật lại giao diện và Rank
             $user->full_avatar_url = $user->avatar ? asset('storage/' . $user->avatar) : null;
             $totalSpent = Order::where('user_id', $user->id)->where('status', 3)->sum('total_amount');
             $user->total_spent = (int)$totalSpent;
@@ -173,12 +174,10 @@ class AuthController extends Controller
                 'message' => 'Cập nhật thông tin thành công',
                 'user' => $user
             ]);
-
         } catch (\Exception $e) {
             return response()->json(['message' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
     }
-
     /**
      * 5. ĐĂNG XUẤT
      */
