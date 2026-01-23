@@ -16,21 +16,46 @@ class ProductStoreController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ProductStore::with(['product', 'creator'])
-            ->orderBy('id', 'desc');
+        try {
+            $query = ProductStore::with(['product', 'creator']);
 
-        // Lọc theo sản phẩm nếu cần
-        if ($request->has('product_id')) {
-            $query->where('product_id', $request->product_id);
+            // 1. Tìm kiếm theo tên sản phẩm (thông qua bảng quan hệ)
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->whereHas('product', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%");
+                });
+            }
+
+            // 2. Lọc theo trạng thái (0: Ẩn, 1: Hiện)
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // 3. Sắp xếp theo giá gốc (price_root) hoặc số lượng (qty)
+            if ($request->filled('sort_price')) {
+                $query->orderBy('price_root', $request->sort_price); // 'asc' hoặc 'desc'
+            } elseif ($request->filled('sort_qty')) {
+                $query->orderBy('qty', $request->sort_qty);
+            } else {
+                // Mặc định sắp xếp theo ID mới nhất
+                $query->orderBy('id', 'desc');
+            }
+
+            $limit = $request->limit ?? 10;
+            $items = $query->paginate($limit);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Tải danh sách kho thành công',
+                'data' => $items
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Lỗi hệ thống: ' . $e->getMessage()
+            ], 500);
         }
-
-        $items = $query->paginate(10); // Lấy 10 dòng mỗi trang
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Tải danh sách kho thành công',
-            'data' => $items
-        ]);
     }
 
     /**
@@ -71,7 +96,6 @@ class ProductStoreController extends Controller
                 'message' => 'Nhập kho thành công!',
                 'data' => $store
             ], 201);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,

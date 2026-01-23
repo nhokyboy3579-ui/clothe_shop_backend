@@ -13,27 +13,38 @@ use Illuminate\Support\Facades\Auth;
 class PostController extends Controller
 {
     /**
-     * 1. Lấy danh sách bài viết (Có tìm kiếm + Phân trang)
+     * 1. Lấy danh sách bài viết (Có tìm kiếm, lọc theo Topic, Trạng thái + Phân trang)
      */
     public function index(Request $request)
     {
-        // Eager load 'topic' để lấy tên chủ đề, 'author' để lấy tên người tạo
+        // Eager load 'topic' và 'author' (user)
         $query = Post::with(['topic', 'author']);
 
-        // Tìm kiếm theo tiêu đề
-        if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
-            $query->where('title', 'like', "%{$search}%");
+        // --- BỘ LỌC TÌM KIẾM ---
+
+        // Tìm kiếm theo tiêu đề (Title)
+        if ($request->filled('search')) {
+            $query->where('title', 'like', "%{$request->search}%");
+        }
+
+        // Lọc theo Chủ đề (topic_id) - Khớp với dropdown filter ở Frontend
+        if ($request->filled('topic_id')) {
+            $query->where('topic_id', $request->topic_id);
+        }
+
+        // Lọc theo Trạng thái (status) - Khớp với dropdown filter ở Frontend
+        if ($request->has('status') && $request->status !== null && $request->status !== '') {
+            $query->where('status', $request->status);
         }
 
         // Lọc theo loại (post/page)
-        if ($request->has('type') && !empty($request->type)) {
+        if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
-        // Sắp xếp mới nhất trước
+        // Sắp xếp mặc định: Mới nhất lên đầu
         $posts = $query->orderBy('created_at', 'desc')
-                       ->paginate($request->limit ?? 10);
+            ->paginate($request->limit ?? 10);
 
         return response()->json($posts);
     }
@@ -43,14 +54,13 @@ class PostController extends Controller
      */
     public function getTopics()
     {
+        // Lấy tất cả topic để admin có thể gán bài viết
         $topics = Topic::select('id', 'name')
-                       ->where('status', 1) // Chỉ lấy topic đang hoạt động
-                       ->get();
+            ->where('status', 1)
+            ->orderBy('name', 'asc')
+            ->get();
 
-        return response()->json([
-            'status' => true,
-            'data' => $topics
-        ]);
+        return response()->json($topics); // Trả về mảng để Frontend dễ map
     }
 
     /**
@@ -58,7 +68,7 @@ class PostController extends Controller
      */
     public function show($id)
     {
-        $post = Post::find($id);
+        $post = Post::with(['topic'])->find($id);
         if (!$post) {
             return response()->json(['status' => false, 'message' => 'Không tìm thấy bài viết'], 404);
         }
@@ -71,36 +81,34 @@ class PostController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'title' => 'required|string|max:255',
+            'title'    => 'required|string|max:255',
             'topic_id' => 'nullable|exists:topics,id',
-            'content' => 'required',
-            'type' => 'required|in:post,page',
-            'status' => 'required|in:0,1',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'content'  => 'required',
+            'type'     => 'required|in:post,page',
+            'status'   => 'required|in:0,1',
+            'image'    => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $data = $request->all();
 
-        // Tự động tạo Slug nếu không nhập
-        if (empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['title']);
-        }
-        // Check trùng slug
-        if (Post::where('slug', $data['slug'])->exists()) {
-            $data['slug'] .= '-' . time();
+        // Xử lý Slug
+        $data['slug'] = $request->filled('slug') ? Str::slug($request->slug) : Str::slug($request->title);
+
+        // Kiểm tra trùng slug và tự thêm hậu tố nếu cần
+        $originalSlug = $data['slug'];
+        $count = 1;
+        while (Post::where('slug', $data['slug'])->exists()) {
+            $data['slug'] = $originalSlug . '-' . $count++;
         }
 
-        // Upload Ảnh
+        // Xử lý Upload Ảnh
         if ($request->hasFile('image')) {
-            // Lưu vào storage/app/public/uploads/posts
             $path = $request->file('image')->store('uploads/posts', 'public');
             $data['image'] = $path;
         }
 
-        // Gán người tạo
-        if (Auth::check()) {
-            $data['created_by'] = Auth::id();
-        }
+        // Gán người tạo từ Auth (nếu có)
+        $data['created_by'] = Auth::id() ?? 1; // Mặc định 1 nếu chưa cài đặt middleware
 
         $post = Post::create($data);
 
@@ -122,41 +130,39 @@ class PostController extends Controller
         }
 
         $request->validate([
-            'title' => 'required|string|max:255',
+            'title'    => 'required|string|max:255',
             'topic_id' => 'nullable|exists:topics,id',
-            'content' => 'required',
-            'type' => 'required|in:post,page',
-            'status' => 'required|in:0,1',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'content'  => 'required',
+            'type'     => 'required|in:post,page',
+            'status'   => 'required|in:0,1',
+            'image'    => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
-        $data = $request->except(['image']); // Loại image ra để xử lý riêng
+        $data = $request->except(['image']);
 
-        // Xử lý Slug (nếu người dùng thay đổi slug)
-        if ($request->filled('slug') && $request->slug != $post->slug) {
-             // Check trùng slug với bài khác
-             if (Post::where('slug', $request->slug)->where('id', '!=', $id)->exists()) {
-                 $data['slug'] = $request->slug . '-' . time();
-             } else {
-                 $data['slug'] = $request->slug;
-             }
+        // Cập nhật Slug nếu có thay đổi hoặc title thay đổi
+        if ($request->filled('slug')) {
+            $newSlug = Str::slug($request->slug);
+            if ($newSlug !== $post->slug) {
+                $originalSlug = $newSlug;
+                $count = 1;
+                while (Post::where('slug', $newSlug)->where('id', '!=', $id)->exists()) {
+                    $newSlug = $originalSlug . '-' . $count++;
+                }
+                $data['slug'] = $newSlug;
+            }
         }
 
         // Xử lý Ảnh mới
         if ($request->hasFile('image')) {
-            // Xóa ảnh cũ
+            // Xóa ảnh cũ nếu tồn tại
             if ($post->image && Storage::disk('public')->exists($post->image)) {
                 Storage::disk('public')->delete($post->image);
             }
-            // Lưu ảnh mới
-            $path = $request->file('image')->store('uploads/posts', 'public');
-            $data['image'] = $path;
+            $data['image'] = $request->file('image')->store('uploads/posts', 'public');
         }
 
-        // Gán người cập nhật
-        if (Auth::check()) {
-            $data['updated_by'] = Auth::id();
-        }
+        $data['updated_by'] = Auth::id() ?? 1;
 
         $post->update($data);
 
@@ -174,10 +180,10 @@ class PostController extends Controller
     {
         $post = Post::find($id);
         if (!$post) {
-            return response()->json(['message' => 'Not found'], 404);
+            return response()->json(['message' => 'Không tìm thấy bài viết để xóa'], 404);
         }
 
-        // Xóa ảnh khỏi ổ cứng
+        // Xóa ảnh vật lý
         if ($post->image && Storage::disk('public')->exists($post->image)) {
             Storage::disk('public')->delete($post->image);
         }
@@ -186,7 +192,7 @@ class PostController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Xóa thành công'
+            'message' => 'Xóa bài viết thành công'
         ]);
     }
 }

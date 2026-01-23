@@ -30,7 +30,10 @@ use App\Http\Controllers\Api\Site\ProductInventoryController;
 use App\Http\Controllers\Api\Site\UserTopicController;
 use App\Http\Controllers\Api\Site\UserPostController;
 use App\Http\Controllers\Api\Site\ForgotPasswordController;
-use App\Http\Controllers\Api\Payment\MomoController; // <--- THÊM MỚI CONTROLLER MOMO
+use App\Http\Controllers\Api\Site\RelatedProductController;
+
+//Payment Method
+use App\Http\Controllers\Api\Payment\MomoController;
 
 // --- 2. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP) ---
 Route::post('/register', [AuthController::class, 'register']);
@@ -46,6 +49,7 @@ Route::get('posts', [UserPostController::class, 'index']);
 Route::get('posts/{slug}', [UserPostController::class, 'show']);
 Route::post('/forgot-password/send-otp', [ForgotPasswordController::class, 'sendOtp']);
 Route::post('/forgot-password/verify-reset', [ForgotPasswordController::class, 'verifyAndReset']);
+Route::get('/related-products/{id}', [RelatedProductController::class, 'getRelated']);
 
 // --- MOMO CALLBACK (IPN) ---
 // Route này PHẢI nằm ngoài Middleware Auth vì MoMo sẽ gọi trực tiếp
@@ -65,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-orders', [UserOrderController::class, 'myOrders']);
     Route::get('/orders/{id}', [UserOrderController::class, 'show']); // Thêm để frontend polling trạng thái
     Route::post('/orders/{id}/cancel', [UserOrderController::class, 'cancelOrder']);
+    Route::post('/orders/{id}/cancel-unpaid', [UserOrderController::class, 'cancelUnpaidOrder']);
 });
 
 // --- 4. ROUTE ADMIN (QUẢN TRỊ) ---

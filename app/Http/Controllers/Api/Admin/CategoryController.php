@@ -19,26 +19,35 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Category::with('parent')->orderBy('sort_order', 'asc');
+            $query = Category::with('parent');
 
-            if ($request->has('search') && $request->search != '') {
+            // 1. Tìm kiếm theo tên
+            if ($request->filled('search')) {
                 $query->where('name', 'like', '%' . $request->search . '%');
             }
 
-            // Lấy tham số limit/page
-            $limit = $request->limit ?? 10;
-            $page = $request->page ?? 1;
+            // 2. Lọc theo trạng thái (0: Active, 1: Hidden)
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
 
-            // Phân trang
-            $categories = $query->paginate($limit, ['*'], 'page', $page);
+            // 3. Xử lý sắp xếp động
+            $allowedColumns = ['id', 'name', 'sort_order', 'created_at']; // Các cột cho phép sort
+            $sortColumn = in_array($request->sort_column, $allowedColumns) ? $request->sort_column : 'sort_order';
+            $sortDirection = in_array($request->sort_direction, ['asc', 'desc']) ? $request->sort_direction : 'asc';
+
+            $query->orderBy($sortColumn, $sortDirection);
+
+            // 4. Phân trang
+            $limit = $request->integer('limit', 10);
+            $categories = $query->paginate($limit);
 
             return response()->json($categories);
         } catch (\Exception $e) {
             \Log::error("Category Index Error: " . $e->getMessage());
-            return response()->json(['message' => 'Lỗi tải danh sách thuộc tính.'], 500);
+            return response()->json(['message' => 'Lỗi tải danh sách danh mục.'], 500);
         }
     }
-
     /**
      * Lấy chi tiết danh mục (show)
      */
@@ -48,8 +57,8 @@ class CategoryController extends Controller
             $category = Category::findOrFail($id);
             return response()->json($category);
         } catch (\Exception $e) {
-             \Log::error("Category Show Error for ID {$id}: " . $e->getMessage());
-             return response()->json(['message' => 'Lỗi tải chi tiết danh mục từ server.'], 500);
+            \Log::error("Category Show Error for ID {$id}: " . $e->getMessage());
+            return response()->json(['message' => 'Lỗi tải chi tiết danh mục từ server.'], 500);
         }
     }
 
@@ -93,9 +102,10 @@ class CategoryController extends Controller
 
             DB::commit();
             return response()->json(['status' => true, 'message' => 'Thêm danh mục thành công!', 'category' => $category], 201);
-
         } catch (\Exception $e) {
-            if (isset($relativePath)) { Storage::disk('public')->delete($relativePath); }
+            if (isset($relativePath)) {
+                Storage::disk('public')->delete($relativePath);
+            }
             DB::rollBack();
             \Log::error("Category Store Error: " . $e->getMessage());
             return response()->json(['message' => 'Lỗi server khi thêm danh mục.'], 500);
@@ -158,9 +168,10 @@ class CategoryController extends Controller
             DB::commit();
 
             return response()->json(['status' => true, 'message' => 'Cập nhật danh mục thành công!', 'category' => $category]);
-
         } catch (\Exception $e) {
-            if (isset($relativePath)) { Storage::disk('public')->delete($relativePath); }
+            if (isset($relativePath)) {
+                Storage::disk('public')->delete($relativePath);
+            }
             DB::rollBack();
             \Log::error("Category Update Error: " . $e->getMessage());
             return response()->json(['message' => 'Lỗi server khi cập nhật danh mục.'], 500);
@@ -175,23 +186,23 @@ class CategoryController extends Controller
         $category = Category::withCount('children', 'products')->findOrFail($id);
 
         if ($category->children_count > 0) {
-             return response()->json(['message' => 'Không thể xóa: Danh mục này còn danh mục con.'], 409);
+            return response()->json(['message' => 'Không thể xóa: Danh mục này còn danh mục con.'], 409);
         }
         if ($category->products_count > 0) {
-             return response()->json(['message' => 'Không thể xóa: Danh mục này còn sản phẩm.'], 409);
+            return response()->json(['message' => 'Không thể xóa: Danh mục này còn sản phẩm.'], 409);
         }
 
         DB::beginTransaction();
         try {
             // Xóa file vật lý bằng URL tuyệt đối
             if ($category->image) {
-                 $pathToDelete = Str::after($category->image, asset('storage') . '/');
-                 Storage::disk('public')->delete($pathToDelete);
+                $pathToDelete = Str::after($category->image, asset('storage') . '/');
+                Storage::disk('public')->delete($pathToDelete);
             }
 
             $category->delete();
             DB::commit();
-            return response()->json([ 'status' => true, 'message' => 'Xóa danh mục thành công.', 'category_id' => $id ]);
+            return response()->json(['status' => true, 'message' => 'Xóa danh mục thành công.', 'category_id' => $id]);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("Category Delete Error: " . $e->getMessage());

@@ -211,4 +211,19 @@ class UserOrderController extends Controller
         // Trả về thông tin đơn hàng (bao gồm status và payment_status)
         return response()->json($order);
     }
+    public function cancelUnpaid($id)
+    {
+        $order = Order::findOrFail($id);
+
+        // Chỉ hủy nếu đơn hàng đang ở trạng thái "Mới" (1) và chưa thanh toán
+        if ($order->status == 1 && $order->payment_status !== 'Paid') {
+            $order->status = 5; // Trạng thái "Hủy"
+            $order->cancel_reason = "Người dùng thoát khỏi trang thanh toán";
+            $order->save();
+
+            return response()->json(['status' => 'cancelled']);
+        }
+
+        return response()->json(['status' => 'no_change']);
+    }
 }

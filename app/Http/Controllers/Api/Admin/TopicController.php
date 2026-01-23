@@ -11,59 +11,73 @@ use Illuminate\Support\Facades\Auth;
 class TopicController extends Controller
 {
     /**
-     * Lấy danh sách (Search + Pagination)
+     * 1. Lấy danh sách (Search + Filter Status + Pagination)
      */
     public function index(Request $request)
     {
         $query = Topic::query();
 
-        if ($request->has('search') && !empty($request->search)) {
+        // Tìm kiếm theo tên hoặc slug
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%");
+            });
         }
 
-        // Sắp xếp theo thứ tự hiển thị (sort_order) hoặc ngày tạo
+        // Lọc theo trạng thái (0: Ẩn, 1: Hiện) - Khớp với dropdown Frontend
+        if ($request->has('status') && $request->status !== '' && $request->status !== null) {
+            $query->where('status', $request->status);
+        }
+
+        // Sắp xếp: Ưu tiên thứ tự hiển thị (sort_order), sau đó là mới nhất
         $topics = $query->orderBy('sort_order', 'asc')
-                        ->orderBy('created_at', 'desc')
-                        ->paginate($request->limit ?? 10);
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->limit ?? 10);
 
         return response()->json($topics);
     }
 
     /**
-     * Chi tiết
+     * 2. Xem chi tiết
      */
     public function show($id)
     {
         $topic = Topic::find($id);
-        if (!$topic) return response()->json(['message' => 'Not found'], 404);
+        if (!$topic) {
+            return response()->json(['status' => false, 'message' => 'Không tìm thấy chủ đề'], 404);
+        }
         return response()->json(['status' => true, 'data' => $topic]);
     }
 
     /**
-     * Thêm mới
+     * 3. Thêm mới chủ đề
      */
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'status' => 'required|in:0,1',
+            'name'       => 'required|string|max:255',
+            'status'     => 'required|in:0,1',
             'sort_order' => 'nullable|integer',
+            'slug'       => 'nullable|string|max:255',
         ]);
 
         $data = $request->all();
 
-        // Xử lý Slug
-        if (empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['name']);
-        }
-        if (Topic::where('slug', $data['slug'])->exists()) {
-            $data['slug'] .= '-' . time();
-        }
+        // Xử lý Slug: Nếu trống thì lấy theo name, nếu có thì format chuẩn slug
+        $baseSlug = $request->filled('slug') ? Str::slug($request->slug) : Str::slug($request->name);
+        $slug = $baseSlug;
 
-        if (Auth::check()) {
-            $data['created_by'] = Auth::id();
+        // Vòng lặp kiểm tra trùng slug (Tránh lỗi SQL)
+        $count = 1;
+        while (Topic::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $count++;
         }
+        $data['slug'] = $slug;
+
+        // Gán người tạo
+        $data['created_by'] = Auth::id() ?? 1;
 
         $topic = Topic::create($data);
 
@@ -75,55 +89,71 @@ class TopicController extends Controller
     }
 
     /**
-     * Cập nhật
+     * 4. Cập nhật chủ đề
      */
     public function update(Request $request, $id)
     {
         $topic = Topic::find($id);
-        if (!$topic) return response()->json(['message' => 'Not found'], 404);
+        if (!$topic) {
+            return response()->json(['status' => false, 'message' => 'Chủ đề không tồn tại'], 404);
+        }
 
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name'   => 'required|string|max:255',
             'status' => 'required|in:0,1',
+            'sort_order' => 'nullable|integer',
         ]);
 
         $data = $request->all();
 
-        // Xử lý Slug khi update
-        if ($request->filled('slug') && $request->slug != $topic->slug) {
-             if (Topic::where('slug', $request->slug)->where('id', '!=', $id)->exists()) {
-                 $data['slug'] = $request->slug . '-' . time();
-             }
+        // Xử lý Slug khi cập nhật
+        if ($request->filled('slug')) {
+            $newSlug = Str::slug($request->slug);
+            if ($newSlug !== $topic->slug) {
+                $baseSlug = $newSlug;
+                $count = 1;
+                while (Topic::where('slug', $newSlug)->where('id', '!=', $id)->exists()) {
+                    $newSlug = $baseSlug . '-' . $count++;
+                }
+                $data['slug'] = $newSlug;
+            }
         }
 
-        if (Auth::check()) {
-            $data['updated_by'] = Auth::id();
-        }
+        // Gán người cập nhật
+        $data['updated_by'] = Auth::id() ?? 1;
 
         $topic->update($data);
 
         return response()->json([
             'status' => true,
-            'message' => 'Cập nhật thành công',
+            'message' => 'Cập nhật chủ đề thành công',
             'data' => $topic
         ]);
     }
 
     /**
-     * Xóa
+     * 5. Xóa chủ đề
      */
     public function destroy($id)
     {
         $topic = Topic::find($id);
-        if (!$topic) return response()->json(['message' => 'Not found'], 404);
+        if (!$topic) {
+            return response()->json(['status' => false, 'message' => 'Không tìm thấy dữ liệu'], 404);
+        }
 
-        // Kiểm tra xem có bài viết nào thuộc chủ đề này không (Optional)
-        // if ($topic->posts()->exists()) {
-        //     return response()->json(['message' => 'Không thể xóa chủ đề đang chứa bài viết'], 400);
+        // Gợi ý: Kiểm tra xem chủ đề có đang chứa bài viết (Post) không?
+        // if ($topic->posts()->count() > 0) {
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'Không thể xóa chủ đề đang có bài viết hoạt động!'
+        //     ], 400);
         // }
 
         $topic->delete();
 
-        return response()->json(['status' => true, 'message' => 'Xóa thành công']);
+        return response()->json([
+            'status' => true,
+            'message' => 'Xóa chủ đề thành công'
+        ]);
     }
 }
